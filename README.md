@@ -20,7 +20,7 @@ A typical IBM Streams based clickstream applicaion is built around several micro
     * Clickstreams log/data acqusition
     * Decryption and sterilization
     * Sessions or user level enrichment
-2. Hierarchical identification of the evernts
+2. Hierarchical identification of the events
     * Hierarchical categorization of service flows
     * Events identification and classification
     * Deduplication of events with various hirarcies
