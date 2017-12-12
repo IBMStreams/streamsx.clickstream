@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no" ?>
+<toolkitModel xmlns="http://www.ibm.com/xmlns/prod/streams/spl/toolkit" productVersion="4.2.1.1" xmlns:common="http://www.ibm.com/xmlns/prod/streams/spl/common" xmlns:ti="http://www.ibm.com/xmlns/prod/streams/spl/toolkitInfo" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+
+  <toolkit name="ClickstreamIngest" requiredProductVersion="4.0" version="1.0.0">
+    <description>Toolkit Description</description>
+    <uriTable>
+      <uri index="1" value="com.ibm.streamsx.clickstream.ingest/ClkStrmDataTypes.spl"/>
+      <uri index="2" value="com.ibm.streamsx.clickstream.ingest/ClkStrmMessageHubIngest.spl"/>
+    </uriTable>
+    <namespace name="com.ibm.streamsx.clickstream.ingest">
+      <compositeOp column="11" line="10" name="MessageHubIngest" potentialMain="true" uriIndex="2">
+        <parameter defaultValue="getCompileTimeValue(&quot;messageHubTopic&quot;, &quot;dsxClkStrm&quot;)" metaType="Expression" name="messageHubTopic" optional="true" type="&lt;rstring>"/>
+        <parameter defaultValue="getCompileTimeValue(&quot;exportKind&quot;, &quot;dsxClkStrmTupleStream&quot;)" metaType="Expression" name="exportKind" optional="true" type="&lt;rstring>"/>
+      </compositeOp>
+      <type column="6" line="3" name="DSXClkStrm_T" static="true" type="rstring click_event_type, rstring time_stamp, int64 total_number_of_items_in_basket, int64 total_number_of_distinct_items_in_basket, int64 total_price_of_basket, int64 product_price, int64 customer_id, rstring product_name, rstring product_category" uriIndex="1"/>
+    </namespace>
+    <sabFiles>
+      <ti:include path="toolkit.xml" root="toolkitDir"/>
+      <ti:include path="impl/java/lib/**" root="toolkitDir"/>
+      <ti:include path="impl/java/bin/**" root="toolkitDir"/>
+      <ti:include path="impl/bin/**" root="toolkitDir"/>
+      <ti:include path="impl/lib/**" root="toolkitDir"/>
+      <ti:include path="impl/nl/*.dat" root="toolkitDir"/>
+      <ti:include path="etc/**" root="toolkitDir"/>
+      <ti:include path="lib/**" root="toolkitDir"/>
+      <ti:include path="nl/**" root="toolkitDir"/>
+      <ti:include path="opt/**" root="toolkitDir"/>
+    </sabFiles>
+  </toolkit>
+
+</toolkitModel>

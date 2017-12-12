@@ -1,0 +1,13 @@
+namespace com.ibm.streamsx.clickstream.ingest;
+
+type DSXClkStrm_T = 
+	rstring click_event_type,
+	rstring time_stamp,
+	int64 total_number_of_items_in_basket,
+	int64 total_number_of_distinct_items_in_basket, 
+	int64 total_price_of_basket, 
+	int64 product_price, 
+	int64 customer_id, 
+	rstring product_name, 
+	rstring product_category;
+
