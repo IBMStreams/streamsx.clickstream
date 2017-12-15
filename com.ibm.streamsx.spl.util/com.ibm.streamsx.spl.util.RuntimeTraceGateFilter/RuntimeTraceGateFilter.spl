@@ -1,0 +1,24 @@
+namespace com.ibm.streamsx.spl.util.RuntimeTraceGateFilter;
+
+public composite RuntimeTraceGateFilter (input inputStream ; output outputStream)
+{
+	param 
+
+	expression<boolean> $forceOn : false;
+
+	graph 
+
+	stream<I> outputStream = Custom(inputStream as I)
+	{
+		logic onTuple I :
+		{
+			if ($forceOn || isTraceable(Trace.trace))
+			{
+				submit(I,outputStream);                    
+			}
+		}
+		config
+			threadedPort : queue(I, Sys.DropFirst, 500000);
+	}
+}
+
