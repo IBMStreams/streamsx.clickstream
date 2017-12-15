@@ -1,0 +1,9 @@
+namespace com.ibm.streamsx.clickstream.types;
+
+type ClickstreamCommonEvent_T =
+ 	rstring csId, // unique id of a click stream it can be userId, sessionId etc 
+ 	int64   csTimestamp, // epoc time in seconds
+ 	int64   wcTimestamp, // wall clock timestamp
+ 	list<rstring> hLevel, // hierarchical levels of the click stream events
+ 	int32 level, // Zero based index of the level of the event
+ 	map<rstring,rstring> auxAttribute;
