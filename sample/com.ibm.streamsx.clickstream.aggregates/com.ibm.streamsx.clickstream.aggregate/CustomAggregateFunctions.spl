@@ -1,0 +1,69 @@
+namespace com.ibm.streamsx.clickstream.aggregate;
+
+
+
+// ################## itemList ##################
+boolean itemListInit (mutable list<rstring> itemListContext) {
+  clearM(itemListContext);
+  return false;
+}
+
+boolean itemListProcess ( list<rstring> itemList, mutable list<rstring> itemListContext, mutable list<int32> itemCountListContext) {
+    mutable rstring item;
+    for (int32 i in range(itemList)) {
+        item = itemList[i];
+        if (findFirst(itemListContext,item) == -1) {
+            appendM(itemListContext,item);
+            appendM(itemCountListContext,0);
+        }
+    }
+  return false;
+}
+
+list<rstring> itemListResult (mutable list<rstring> itemListContext) {
+  return itemListContext;
+}
+
+// ################## itemCount ##################
+boolean itemCountInit (mutable list<int32> itemCountListContext) {
+  clearM(itemCountListContext);
+  return false;
+}
+
+boolean itemCountProcess ( list<rstring> itemList, list<int32> itemCountList, mutable list<rstring> itemListContext, mutable list<int32> itemCountListContext ) {
+    mutable int32 idx;
+    mutable rstring item;
+    mutable int32 count;
+    for (int32 i in range(itemList)) {
+        // if the itemListContext is already been updated then index would never be -1 
+        item = itemList[i];
+        count    = itemCountList[i];
+        idx = findFirst(itemListContext,item);
+        if (idx == -1) { // This section is just for protection, may never run
+            appendM(itemListContext,item);
+            appendM(itemCountListContext,count);
+        } else {
+            itemCountListContext[idx] += count;
+        }
+    }
+  return false;
+}
+ 
+list<int32> itemCountResult (mutable list<int32> itemCountListContext) {
+  return itemCountListContext;
+}
+
+
+int32 CountDistinctItemResult (mutable list<int32> itemCountListContext) {
+  return size(itemCountListContext);
+}
+
+int32 TotalItemCountResult(mutable list<int32> itemCountListContext){
+	mutable int32 totalitemCount = 0;
+	for(int32 i in range(size(itemCountListContext))){
+		totalitemCount+=(int32)itemCountListContext[i];
+	}
+	return totalitemCount;
+}
+
+
