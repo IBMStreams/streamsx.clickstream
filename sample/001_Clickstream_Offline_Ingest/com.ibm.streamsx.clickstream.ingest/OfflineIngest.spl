@@ -1,0 +1,33 @@
+namespace com.ibm.streamsx.clickstream.ingest ;
+
+use com.ibm.streamsx.clickstream.dsx::*;
+
+composite OfflineIngest
+{
+	param
+		// expression<rstring> $messageHubTopic : getCompileTimeValue("messageHubTopic", "dsxClkStrm") ;
+		expression<rstring> $exportKind : getCompileTimeValue("exportKind", "dsxClkStrmTupleStream") ;
+		
+	graph
+		stream<rstring name> DirScanData = DirectoryScan()
+		{
+			param
+				directory : spl.utility::dataDirectory() ;
+				initDelay : 5.0;
+		}
+
+		stream<DSXClkStrm_T> TupleClkStrm  = FileSource(DirScanData)
+		{
+			param
+				hasDelayField : true ; 
+				format : csv ;
+				compression : gzip ;
+		}
+
+		() as ExportClkStrm = Export(TupleClkStrm)
+		{
+			param
+				properties : { kind = $exportKind } ;
+		}
+}
+
