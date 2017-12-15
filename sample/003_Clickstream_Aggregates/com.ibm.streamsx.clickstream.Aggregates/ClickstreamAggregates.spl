@@ -1,0 +1,159 @@
+namespace com.ibm.streamsx.clickstream.Aggregates ;
+
+use com.ibm.streamsx.clickstream.dsx::* ;
+use com.ibm.streamsx.clickstream.aggregate::* ;
+use com.ibm.streamsx.spl.util.RuntimeTraceGateFilter::* ;
+
+composite ClickstreamAggregates
+{
+	param
+		expression<rstring> $importKind                : getCompileTimeValue("importKind", "ClkStrmEnrichedTupleStream") ;
+		expression<rstring> $exportCountByDistinctKind : getCompileTimeValue("exportCountByDistinctKind", "ClkStrmCountByDistinctAggregateStream") ;
+		expression<rstring> $exportCountDistinctKind   : getCompileTimeValue("exportCountDistinctKind"  , "ClkStrmCountByDistinctAggregateStream") ;
+		expression<rstring> $dataOutDir                : getSubmissionTimeValue("dataOutDir", "") ;
+		expression<float64> $throttleRate     :(float64) getSubmissionTimeValue("throttleRate", "100000.0") ;
+		type $inputType                    : DSXClkStrmEnriched_T ;
+		type $CountByDistinctAggregateType : CountByDistinctAggregate_T ;
+		type $CountDistinctAggregateType   : CountDistinctAggregate_T ;
+		
+	graph
+		stream<$inputType> TupleClkStrm = Import()
+		{
+			param
+				subscription : kind == $importKind ;
+		}
+
+		stream<$inputType> ThrottleClkStm = Throttle(TupleClkStrm)
+		{
+			param
+				rate : $throttleRate ;
+			config
+				threadedPort : queue(TupleClkStrm, Sys.DropFirst, 100000) ;
+		}
+
+		/*
+		 * In a given windows 
+		 * How many products in a given category
+		 */
+		(   stream<$CountByDistinctAggregateType> CountByDistinctAggregateOut0 ;
+			stream<$CountByDistinctAggregateType> CountByDistinctAggregateOut1 ;
+			stream<$CountByDistinctAggregateType> CountByDistinctAggregateOut2 ;
+			stream<$CountByDistinctAggregateType> CountByDistinctAggregateOut3 ;
+			stream<$CountByDistinctAggregateType> CountByDistinctAggregateOut4) as
+			FiveStageCountByDistinct =
+			CountByDistinctFiveStageProgressiveAggregate(ThrottleClkStm as t)
+		{
+			param
+				timestampField : csTimestamp ;
+				wcTimestampField : wcTimestamp ;
+				groupByField : product_category ;
+				itemField : product_name ;
+				agg1WindowInSec :(int64) 5 ;
+				agg2WindowInSec :(int64) 60 ;
+				agg3WindowInSec :(int64) 300 ;
+				agg4WindowInSec :(int64) 3600 ;
+				agg5WindowInSec :(int64) 86400 ;
+				label : [ "count_product_name_By_category_5_Sec",
+					"count_product_name_By_category_1_min",
+					"count_product_name_By_category_5_min",
+					"count_product_name_By_category_1_hour",
+					"count_product_name_By_category_1_day" ] ;
+		}
+		
+		stream<$CountByDistinctAggregateType> FiveStageCountByDistinctAggregateStream =
+			Functor(CountByDistinctAggregateOut0, 
+					CountByDistinctAggregateOut1,
+					CountByDistinctAggregateOut2, 
+					CountByDistinctAggregateOut3,
+					CountByDistinctAggregateOut4) { }
+		
+		() as ExportCountByDistinctClkStrm = Export(FiveStageCountByDistinctAggregateStream)
+		{
+			param
+				properties : { kind = $exportCountByDistinctKind } ;
+		}
+
+		stream<$CountByDistinctAggregateType> RunGated =
+			RuntimeTraceGateFilter(FiveStageCountByDistinctAggregateStream)
+		{
+		}
+
+		// The following operator will have to the replaced with Object Storage in cloud deployment
+		() as FileSinkRunGated = FileSink(RunGated)
+		{
+			param
+				hasDelayField : true ; // Add the time delay field for timed offline replay
+				file : dataDirectory() +
+					"/ClkStrmCountByDistinctAggregate_{localtime:%Y.%m.%d_%H.%M.%S}.csv.gz" ;
+				format : csv ;
+				flush : 100u ;
+				tuplesPerFile : 10000u ;
+				closeMode : count ;
+				compression : gzip ;
+		}
+
+        /*
+		 * In a given windows 
+		 * How many customer ids in a given event type
+		 */
+		 
+		(   stream<$CountDistinctAggregateType> CountDistinctAggregateOut0 ;
+			stream<$CountDistinctAggregateType> CountDistinctAggregateOut1 ;
+			stream<$CountDistinctAggregateType> CountDistinctAggregateOut2 ;
+			stream<$CountDistinctAggregateType> CountDistinctAggregateOut3 ;
+			stream<$CountDistinctAggregateType> CountDistinctAggregateOut4) as
+			FiveStageCountDistinctAggregateAlias =
+			CountDistinctFiveStageProgressiveAggregate(ThrottleClkStm as t)
+		{
+			param
+				timestampField : csTimestamp ;
+				wcTimestampField : wcTimestamp ;
+				groupByField : click_event_type ;
+				itemField : customer_id ;
+				agg1WindowInSec :(int64) 5 ;
+				agg2WindowInSec :(int64) 60 ;
+				agg3WindowInSec :(int64) 300 ;
+				agg4WindowInSec :(int64) 3600 ;
+				agg5WindowInSec :(int64) 86400 ;
+				label : [ 
+					"count_customers_By_event_5_Sec",
+					"count_customers_By_event_1_min",
+					"count_customers_By_event_5_min",
+					"count_customers_By_event_1_hour",
+					"count_customers_By_event_1_day" ] ;
+		}
+
+		stream<$CountDistinctAggregateType> FiveStageCountDistinctAggregate =
+			Functor(CountDistinctAggregateOut0, 
+					CountDistinctAggregateOut1,
+					CountDistinctAggregateOut2, 
+					CountDistinctAggregateOut3,
+					CountDistinctAggregateOut4) {}
+
+		() as ExportCountDistinctClkStrm = Export(FiveStageCountDistinctAggregate)
+		{
+			param
+				properties : { kind = $exportCountDistinctKind } ;
+		}
+
+		stream<$CountDistinctAggregateType> RunGatedCountDistinct =
+			RuntimeTraceGateFilter(FiveStageCountDistinctAggregate)
+		{
+		}
+
+		// The following operator will have to the replaced with Object Storage in cloud deployment
+		() as FileSinkRunGatedCountDistinct = FileSink(RunGatedCountDistinct)
+		{
+			param
+				hasDelayField : true ; // Add the time delay field for timed offline replay
+				file : dataDirectory() +
+					"/ClkStrmCountDistinctAggregate_{localtime:%Y.%m.%d_%H.%M.%S}.csv.gz" ;
+				format : csv ;
+				flush : 100u ;
+				tuplesPerFile : 10000u ;
+				closeMode : count ;
+				compression : gzip ;
+		}
+
+}
+
