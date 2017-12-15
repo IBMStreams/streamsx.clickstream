@@ -1,0 +1,51 @@
+namespace com.ibm.streamsx.clickstream.aggregate;
+
+
+type CountByDistinctAggregate_T = 
+                                rstring label,
+                                rstring groupName,
+                                list<rstring> itemCollectDistinct,
+                                list<int32> itemCountByDistinct,
+                                int64 firstTimestampInSec, 
+                                int64 timestampInSec, // lastTimeStamp
+                                int64 wcTimestampFirst, 
+                                int64 wcTimestampLast;
+
+type CountDistinctWithListAggregate_T = 
+                                rstring label,
+                                rstring groupName,
+                                list<rstring> itemCollectDistinct,
+                                list<int32> itemCountByDistinct,
+                                int32 itemCountDistinct,
+                                int32 itemCount,
+                                int64 firstTimestampInSec, 
+                                int64 timestampInSec, // lastTimeStamp
+                                int64 wcTimestampFirst, 
+                                int64 wcTimestampLast;
+ 
+type CountDistinctAggregate_T = 
+                                rstring label,
+                                rstring groupName,
+                                int32 itemCountDistinct,
+                                int32 itemCount,
+                                int64 firstTimestampInSec, 
+                                int64 timestampInSec, // lastTimeStamp
+                                int64 wcTimestampFirst, 
+                                int64 wcTimestampLast;
+                                                  
+                                
+type CountByDistinctAggRedis_T = 
+                                rstring groupName,
+                                int64 firstTimestampInSec, 
+                                int64 timestampInSec, // lastTimeStamp
+                                list<rstring> itemList,
+                                list<int32> itemCountList,
+                                int32 rollingIndex;
+    
+type ToBeCountedByDistinct_T = 
+                                int64 timestampInSec,
+                                int64 wcTimestamp, 
+                                rstring groupByField,
+                                rstring item;
+                                
+
