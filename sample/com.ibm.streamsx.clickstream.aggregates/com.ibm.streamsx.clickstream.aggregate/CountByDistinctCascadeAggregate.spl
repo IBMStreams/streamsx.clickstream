@@ -1,0 +1,39 @@
+namespace com.ibm.streamsx.clickstream.aggregate ;
+
+use com.ibm.streamsx.clickstream.util::* ;
+
+
+public composite CountByDistinctCascadeAggregate(output stream<CountByDistinctAggregate_T> CountByDistinctCascadedAggregate ; input stream<CountByDistinctAggregate_T> InputStream)
+{
+	param
+		expression<int64> $WindowInSec ; // Tumbling window in sec
+		expression<rstring> $label; // name of the aggregate 
+	graph
+		stream<InputStream> PunctuatedAggregatedInputStream = ClickstreamsTimestampPunctor(InputStream)
+		{
+			param
+				WindowInSec :  $WindowInSec ;
+				timestampField : timestampInSec  ;
+		}
+		
+		 stream<CountByDistinctAggregate_T> CountByDistinctCascadedAggregate = Aggregate(PunctuatedAggregatedInputStream as T)
+        {
+            logic state : {
+            mutable list<rstring> itemListContext = [];
+            mutable list<int32> itemCountListContext = [];
+            }
+            window
+                T : tumbling, punct();
+            param
+                groupBy : groupName ;
+            output
+                CountByDistinctCascadedAggregate : groupName = Any(groupName),
+                    firstTimestampInSec = First(timestampInSec), 
+                    timestampInSec = Last(timestampInSec), 
+                    wcTimestampFirst = First(wcTimestampFirst), 
+                    wcTimestampLast  = Last(wcTimestampLast),
+                    itemList = Custom (itemListInit(itemListContext), itemListProcess(itemList,itemListContext,itemCountListContext),itemListResult (itemListContext)),
+                    itemCountList = Custom (itemCountInit(itemCountListContext), itemCountProcess(itemList,itemCountList,itemListContext,itemCountListContext),itemCountResult (itemCountListContext)),
+                    label = $label;
+        } 
+}
