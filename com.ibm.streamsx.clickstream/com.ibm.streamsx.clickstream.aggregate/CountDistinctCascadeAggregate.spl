@@ -1,0 +1,41 @@
+namespace com.ibm.streamsx.clickstream.aggregate ;
+
+use com.ibm.streamsx.clickstream.util::* ;
+
+
+public composite CountDistinctCascadeAggregate(output stream<CountDistinctWithListAggregate_T> CountDistinctCascadedAggregate ; input stream<CountDistinctWithListAggregate_T> InputStream)
+{
+	param
+		expression<int64> $WindowInSec ; // Tumbling window in sec
+		expression<rstring> $label; // name of the aggregate 
+	graph
+		stream<InputStream> PunctuatedAggregatedInputStream = ClickstreamsTimestampPunctor(InputStream)
+		{
+			param
+				WindowInSec :  $WindowInSec ;
+				timestampField : timestampInSec  ;
+		}
+		
+		 stream<CountDistinctWithListAggregate_T> CountDistinctCascadedAggregate = Aggregate(PunctuatedAggregatedInputStream as T)
+        {
+            logic state : {
+            mutable list<rstring> itemListContext = [];
+            mutable list<int32> itemCountListContext = [];
+            }
+            window
+                T : tumbling, punct();
+            param
+                groupBy : groupName ;
+            output
+                CountDistinctCascadedAggregate : groupName = Any(groupName),
+                    firstTimestampInSec = First(timestampInSec), 
+                    timestampInSec = Last(timestampInSec), 
+                    wcTimestampFirst = First(wcTimestampFirst), 
+                    wcTimestampLast  = Last(wcTimestampLast),
+                    itemCollectDistinct = Custom (itemListInit(itemListContext), itemListProcess(itemCollectDistinct,itemListContext,itemCountListContext),itemListResult (itemListContext)),
+                    itemCountByDistinct = Custom (itemCountInit(itemCountListContext), itemCountProcess(itemCollectDistinct,itemCountByDistinct,itemListContext,itemCountListContext),itemCountResult (itemCountListContext)),
+                    itemCountDistinct = Custom (itemCountInit(itemCountListContext), dummyProcess(), CountDistinctItemResult (itemCountListContext)),
+                    itemCount = Custom(itemCountInit(itemCountListContext), dummyProcess(), TotalItemCountResult (itemCountListContext) ),
+                    label = $label;
+        } 
+}
