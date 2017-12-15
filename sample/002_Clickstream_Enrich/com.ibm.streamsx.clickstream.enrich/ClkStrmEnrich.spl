@@ -1,0 +1,96 @@
+namespace com.ibm.streamsx.clickstream.enrich ;
+
+use com.ibm.streamsx.spl.util.RuntimeTraceGateFilter::* ;
+use com.ibm.streamsx.clickstream.dsx::*;
+
+/*
+ * After ingesting a typical click stream the next logical stage
+ * will enrich the stream. In this process following is done :
+ * 1. Fix data formats and type conversions
+ * 2. Enrich data with local state or offline data or other online stream
+ * 3. Fix ordering of the data if necessary 
+ * 4. Convert the data stream to click-stream common event type for down stream analytics
+ */
+ 
+ /*
+  * EPOC Time conversion -- https://www.epochconverter.com/
+  * Example : 2017-12-13T12:30:41 ==> Timestamp = 1513197041
+  * Wednesday, December 13, 2017 12:30:41 PM GMT-08:00
+  */
+ 	
+ 	
+composite ClkStrmEnrich
+{
+	param
+		expression<rstring> $importKind : getCompileTimeValue("importKind", "dsxClkStrmTupleStream") ;
+		expression<rstring> $exportKind : getCompileTimeValue("exportKind", "ClkStrmEnrichedTupleStream") ;
+		expression<rstring> $dataOutDir : getSubmissionTimeValue("dataOutDir" , "" ) ;
+		expression<float64> $throttleRate : (float64) getSubmissionTimeValue("throttleRate" , "100000.0") ;
+		
+	graph
+	
+		stream<DSXClkStrm_T> TupleClkStrm  = Import()
+		{
+			param
+				subscription : kind == $importKind ;
+		}
+
+		stream<DSXClkStrm_T> ThrottleClkStm = Throttle(TupleClkStrm )
+		{
+			param
+				rate : $throttleRate ;
+			config
+				threadedPort : queue(TupleClkStrm, Sys.DropFirst, 100000 );
+		}
+	/* 
+		stream<DSXClkStrm_T> ThrottleClkStm  = FileSource()
+		{
+			param
+				file : "/mnt/hgfs/StreamsDockerWorkspace/streamsx.clickstream/sample/OfflineIngest/data/dsxClkStrm_2017.12.12_19.29.53_.csv.gz";
+				hasDelayField : true ; 
+				format : csv ;
+				compression : gzip ;
+		}
+	*/	
+		@catch(exception=streams, tupleTrace=true, stackTrace=false)
+		stream<DSXClkStrmEnriched_T> ClkStrmEnriched = Custom(ThrottleClkStm as t)
+		{
+			logic
+				onTuple t :
+				{
+					mutable DSXClkStrmEnriched_T oT = {};
+					assignFrom(oT,t);
+					oT.csTimestamp =  getSeconds( toTimestamp(Sys.YYYY_MM_DD_hh_mm_ss, t.time_stamp ) );
+					oT.wcTimestamp =  (int64) getTimestampInSecs();
+					submit(oT,ClkStrmEnriched);
+				}
+				onPunct t : {
+					submit(currentPunct(), ClkStrmEnriched);
+				}
+		}
+
+		stream<DSXClkStrmEnriched_T> RunGatedClkStrm = RuntimeTraceGateFilter(ClkStrmEnriched)
+		{
+		}
+
+		() as ExportClkStrm = Export(ClkStrmEnriched)
+		{
+			param
+				properties : { kind = $exportKind } ;
+		}
+
+		// The following operator will have to the replaced with Object Storage in cloud deployment
+		() as FileSinkClkStrm = FileSink(RunGatedClkStrm)
+		{
+			param
+				hasDelayField : true ; // Add the time delay field for timed offline replay
+				file : $dataOutDir + "ClkStrmEnriched_{localtime:%Y.%m.%d_%H.%M.%S}.csv.gz" ;
+				format : csv ;
+				flush : 1000u ;
+				tuplesPerFile : 1000000u ;
+				closeMode : count ;
+				compression : gzip ;
+		}
+
+}
+
