@@ -1,0 +1,72 @@
+namespace com.ibm.streamsx.clickstream.aggregate ;
+
+use com.ibm.streamsx.clickstream.util::* ;
+
+public composite CountByDistinctFiveStageProgressiveAggregate (input  InputStream; output aggOut1, aggOut2, aggOut3, aggOut4, aggOut5 ) {
+
+    param
+        expression<int64>   $agg1WindowInSec : (int64) 5     ; // Tumbling window in sec for the smallest windows of Aggregate
+        expression<int64>   $agg2WindowInSec : (int64) 60    ; // Tumbling window in sec for the next     windows of Aggregate
+        expression<int64>   $agg3WindowInSec : (int64) 300   ; // Tumbling window in sec for the next     windows of Aggregate
+        expression<int64>   $agg4WindowInSec : (int64) 3600  ; // Tumbling window in sec for the next     windows of Aggregate
+        expression<int64>   $agg5WindowInSec : (int64) 86400 ; // Tumbling window in sec for the largest windows of Aggregate
+        
+        expression $timestampField;  // int64 Timestamp field - epoch time in sec 
+        expression $wcTimestampField ; // Wall clock timestamp field - e.g. epoch time in sec 
+        expression $groupByField;    // Field name to be used for groupBy
+        expression $itemField;       // Filed name of items to be counted by distinct
+        expression<list<rstring>> $label;
+        
+    graph
+        
+        //#########################    aggOut1 : Aggregate the incoming tuples for given  Nsec - time duration
+        stream<CountByDistinctAggregate_T> aggOut1 =
+            CountByDistinctAggregate(InputStream)
+        {
+            param
+                WindowInSec : $agg1WindowInSec ;   
+                timestampField : $timestampField ;
+                wcTimestampField : $wcTimestampField;
+                groupByField : $groupByField ;  
+                itemField :$itemField ;   
+                label : $label[0];
+        }
+       
+        //#########################   aggOut2
+        stream<CountByDistinctAggregate_T> aggOut2 =
+            CountByDistinctCascadeAggregate(aggOut1)
+        {
+            param
+                WindowInSec : $agg2WindowInSec;
+                label : $label[1]; 
+        }
+        
+        //#########################   aggOut3
+        stream<CountByDistinctAggregate_T> aggOut3 =
+            CountByDistinctCascadeAggregate(aggOut2)
+        {
+            param
+                WindowInSec :  $agg3WindowInSec; 
+                label : $label[2];
+        }
+
+        //#########################   aggOut4
+        stream<CountByDistinctAggregate_T> aggOut4 =
+            CountByDistinctCascadeAggregate(aggOut3)
+        {
+            param
+                WindowInSec :  $agg4WindowInSec;
+                label : $label[3];
+        }
+
+        //#########################   aggOut5
+        stream<CountByDistinctAggregate_T> aggOut5 =
+            CountByDistinctCascadeAggregate(aggOut4)
+        {
+            param
+                WindowInSec : $agg5WindowInSec;
+                label : $label[4];
+        }
+
+}
+   
