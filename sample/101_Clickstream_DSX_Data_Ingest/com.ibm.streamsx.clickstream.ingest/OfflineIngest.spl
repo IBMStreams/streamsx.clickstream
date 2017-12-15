@@ -1,0 +1,79 @@
+namespace com.ibm.streamsx.clickstream.ingest ;
+
+use com.ibm.streamsx.clickstream.dsx::*;
+
+/*
+ * customer_id	
+ * time_stamp
+ * click_event_type	
+ * total_price_of_basket	
+ * total_number_of_items_in_basket	
+ * total_number_of_distinct_items_in_basket	
+ * product_name	
+ * product_category	
+ * product_price
+ */	
+
+composite DSXOfflineIngest
+{
+	param
+		expression<rstring> $exportKind : getCompileTimeValue("exportKind", "dsxClkStrmTupleStream") ;
+		expression<rstring> $dsxDataDir : getCompileTimeValue("dsxDataDir", "/home/streamsadmin/host_workspace/offlineDSXData") ;
+	graph
+		stream<rstring name> DirScanData = DirectoryScan()
+		{
+			param
+				// directory : spl.utility::dataDirectory() ;
+				directory : $dsxDataDir;
+				initDelay : 2.0;
+				sortBy : name;
+				order : ascending;
+		}
+
+		() as PrintLn = Custom(DirScanData) {
+			logic
+			onTuple DirScanData : {
+				println((rstring) DirScanData);
+			
+			}
+		} 
+	
+		stream<FlowDesignerClkStrm_T> TupleClkStrm  = FileSource(DirScanData)
+		{
+			param
+				hasHeaderLine : true;
+				format : csv ;
+		}
+		stream<DSXClkStrm_T> TupleDSXClkStrm = Custom(TupleClkStrm as inT) {
+		logic
+		onTuple TupleClkStrm : {
+			mutable DSXClkStrm_T outT = {};
+			mutable tuple<int32 sec, int32 min, int32 hour, int32 mday, int32 mon, int32 year, int32 wday, int32 yday, int32 isdst, int32 gmtoff, rstring zone> result = {};
+			gmtime (inT.time_stamp, result);
+			assignFrom(outT,inT);
+			outT.time_stamp = strftime (result, "%FT%T");
+			submit(outT,TupleDSXClkStrm);
+			// printStringLn( com.ibm.streamsx.json::tupleToJSON(outT));
+			}
+		}
+		
+		stream<DSXClkStrm_T> ThrottledDSXClkStrm = Throttle(TupleDSXClkStrm) {
+			param
+				period : 0.001;
+				rate : 20.0;
+				
+		}
+		
+		() as ExportClkStrm = Export(ThrottledDSXClkStrm)
+		{
+			param
+				properties : { kind = $exportKind } ;
+		}
+
+}
+
+/* 
+ * public void gmtime (timestamp time, mutable tuple<int32 sec, int32 min, int32 hour, int32 mday, int32 mon, int32 year, int32 wday, int32 yday, int32 isdst, int32 gmtoff, rstring zone> result)
+ * public rstring strftime (tuple<int32 sec, int32 min, int32 hour, int32 mday, int32 mon, int32 year, int32 wday, int32 yday, int32 isdst, int32 gmtoff, rstring zone> time, rstring format)  
+ */
+
