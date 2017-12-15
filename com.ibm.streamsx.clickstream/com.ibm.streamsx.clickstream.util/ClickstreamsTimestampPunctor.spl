@@ -1,0 +1,38 @@
+namespace com.ibm.streamsx.clickstream.util;
+
+public composite ClickstreamsTimestampPunctor(output oStream; input iStream ) {
+
+	param
+		expression<int64>   $WindowInSec;    // Tumbling window in sec
+        expression $timestampField; // Timestamp field - e.g. epoch time in sec 
+        
+    graph
+ 		//#########################    Inject punctuation for every $WindowInSec - time duration
+        stream<iStream> oStream = Custom(iStream)
+        {
+            logic
+                state :
+                {
+                    mutable int64 lastTimestamp = 0 ;
+                    mutable boolean firstRound = true ;
+                }
+                onTuple iStream :
+                {
+                    if(firstRound ||($timestampField - lastTimestamp) <(int64) 0)
+                    {
+                        lastTimestamp = $timestampField -($timestampField % $WindowInSec) ;
+                        firstRound = false ;
+                    }
+                    if( ($timestampField - lastTimestamp) >= $WindowInSec)
+                    {
+                        lastTimestamp = $timestampField -($timestampField % $WindowInSec) ;
+                        submit(Sys.WindowMarker, oStream) ;
+                    }
+                    submit(iStream, oStream) ;
+                }
+                onPunct iStream : {
+                	// pass 
+                }
+        }
+        
+ }
