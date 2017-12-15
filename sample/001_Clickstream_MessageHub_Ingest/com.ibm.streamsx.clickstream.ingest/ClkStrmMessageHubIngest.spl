@@ -1,0 +1,80 @@
+namespace com.ibm.streamsx.clickstream.ingest;
+/*
+ * This little micro-service ingests sample Clickstream data 
+ * provided by IBM DSX via messageHub 
+ */
+use com.ibm.streamsx.messagehub::* ;
+use com.ibm.streamsx.json::* ;
+use com.ibm.streamsx.spl.util.RuntimeTraceGateFilter::* ;
+use com.ibm.streamsx.clickstream.dsx::*;
+
+
+composite MessageHubIngest
+{
+	param
+		expression<rstring> $messageHubTopic : getCompileTimeValue("messageHubTopic", "dsxClkStrm") ;
+		expression<rstring> $exportKind : getCompileTimeValue("exportKind", "dsxClkStrmTupleStream") ;
+		expression<float64> $throttleRate : (float64) getSubmissionTimeValue("throttleRate" , "100000000.0") ;
+		
+	graph
+	// one of the attribute must be "message"
+		stream<rstring message> MessageHubClkStrm = MessageHubConsumer()
+		{
+			param
+				topic : $messageHubTopic ;
+		}
+
+		stream<rstring message> ThrottleClkStm = Throttle(MessageHubClkStrm )
+		{
+			param
+				rate : $throttleRate ;
+			config
+				threadedPort : queue(MessageHubClkStrm, Sys.DropFirst, 100000 );
+		}
+
+		stream<DSXClkStrm_T> TupleClkStrm = JSONToTuple(ThrottleClkStm)
+		{
+			param
+				ignoreParsingError : true ;
+		}
+
+		stream<DSXClkStrm_T> RunGatedClkStrm = RuntimeTraceGateFilter(TupleClkStrm)
+		{
+		}
+
+		() as ExportClkStrm = Export(TupleClkStrm)
+		{
+			param
+				properties : { kind = $exportKind } ;
+		}
+
+		// The following operator will have to the replaced with Object Storage in cloud deployment
+		() as FileSinkClkStrm = FileSink(RunGatedClkStrm)
+		{
+			param
+				hasDelayField : true ; // Add the time delay field for timed offline replay
+				file :  dataDirectory() + "/dsxClkStrm_{localtime:%Y.%m.%d_%H.%M.%S}.csv.gz" ;
+				format : csv ;
+				flush : 1000u ;
+				tuplesPerFile : 1000000u ;
+				closeMode : count ;
+				compression : gzip ;
+		}
+
+		/*		
+		/*   standalone testing only 
+		() as PrintLnClkStm = Custom(TupleClkStrm as inputStream)
+		{
+			logic
+				onTuple inputStream :
+				{
+					println((rstring) inputStream) ;
+				}
+
+		}
+ 		*/
+}
+
+
+
+
