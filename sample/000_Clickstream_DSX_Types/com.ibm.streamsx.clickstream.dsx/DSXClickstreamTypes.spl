@@ -1,0 +1,36 @@
+namespace com.ibm.streamsx.clickstream.dsx;
+
+/*
+ * This file contains all the types related to the 
+ * DSX Clickstream Demo Sample applications and it is 
+ * component micro-services
+ */
+
+ 
+type FlowDesignerClkStrm_T = 
+	int64 customer_id, 
+	timestamp time_stamp, 
+	rstring click_event_type,
+	float64 total_price_of_basket, 
+	int64 total_number_of_items_in_basket,
+	int64 total_number_of_distinct_items_in_basket,
+	rstring product_name, 
+	rstring product_category,
+	float64 product_price; 
+	
+	
+type DSXClkStrm_T = 
+	int64 customer_id, 
+	rstring time_stamp, // 2017-12-11T11:42:23
+	rstring click_event_type,
+	float64 total_price_of_basket, 
+	int64 total_number_of_items_in_basket,
+	int64 total_number_of_distinct_items_in_basket, 
+	rstring product_name, 
+	rstring product_category, 
+	float64 product_price;
+
+type DSXClkStrmEnriched_T = DSXClkStrm_T, tuple<int64 csTimestamp, int64 wcTimestamp>;
+
+
+
