@@ -1,0 +1,83 @@
+namespace com.ibm.streamsx.clickstream.aggregate ;
+
+use com.ibm.streamsx.clickstream.util::* ;
+
+public composite CountDistinctFiveStageProgressiveAggregate (input  InputStream; output agg1, agg2, agg3, agg4, agg5 ) {
+
+    param
+        expression<int64>   $agg1WindowInSec : (int64) 5     ; // Tumbling window in sec for the smallest windows of Aggregate
+        expression<int64>   $agg2WindowInSec : (int64) 60    ; // Tumbling window in sec for the next     windows of Aggregate
+        expression<int64>   $agg3WindowInSec : (int64) 300   ; // Tumbling window in sec for the next     windows of Aggregate
+        expression<int64>   $agg4WindowInSec : (int64) 3600  ; // Tumbling window in sec for the next     windows of Aggregate
+        expression<int64>   $agg5WindowInSec : (int64) 86400 ; // Tumbling window in sec for the largest windows of Aggregate
+        
+        expression $timestampField;  // int64 Timestamp field - epoch time in sec 
+        expression $wcTimestampField ; // Wall clock timestamp field - e.g. epoch time in sec 
+        expression $groupByField;    // Field name to be used for groupBy
+        expression $itemField;       // Filed name of items to be counted by distinct
+        expression<list<rstring>> $label;
+        
+    graph
+        
+        //#########################    aggOut1 : Aggregate the incoming tuples for given  Nsec - time duration
+        stream<CountDistinctWithListAggregate_T> aggOut1 =
+            CountDistinctAggregate(InputStream)
+        {
+            param
+                WindowInSec : $agg1WindowInSec ;   
+                timestampField : $timestampField ;
+                wcTimestampField : $wcTimestampField;
+                groupByField : $groupByField ;  
+                itemField :$itemField ;   
+                label : $label[0];
+        }
+       
+       	stream<CountDistinctAggregate_T> agg1 = Functor(aggOut1) { }
+       	
+       	
+        //#########################   aggOut2
+        stream<CountDistinctWithListAggregate_T> aggOut2 =
+            CountDistinctCascadeAggregate(aggOut1)
+        {
+            param
+                WindowInSec : $agg2WindowInSec;
+                label : $label[1]; 
+        }
+        
+        stream<CountDistinctAggregate_T> agg2 = Functor(aggOut2) { }
+        
+        //#########################   aggOut3
+        stream<CountDistinctWithListAggregate_T> aggOut3 =
+            CountDistinctCascadeAggregate(aggOut2)
+        {
+            param
+                WindowInSec :  $agg3WindowInSec; 
+                label : $label[2];
+        }
+
+		stream<CountDistinctAggregate_T> agg3 = Functor(aggOut3) { }
+		
+        //#########################   aggOut4
+        stream<CountDistinctWithListAggregate_T> aggOut4 =
+            CountDistinctCascadeAggregate(aggOut3)
+        {
+            param
+                WindowInSec :  $agg4WindowInSec;
+                label : $label[3];
+        }
+        
+		stream<CountDistinctAggregate_T> agg4 = Functor(aggOut4) { }
+		
+        //#########################   aggOut5
+        stream<CountDistinctWithListAggregate_T> aggOut5 =
+            CountDistinctCascadeAggregate(aggOut4)
+        {
+            param
+                WindowInSec : $agg5WindowInSec;
+                label : $label[4];
+        }
+        
+        stream<CountDistinctAggregate_T> agg5 = Functor(aggOut5) { }
+
+}
+   
