@@ -1,0 +1,169 @@
+namespace com.ibm.streamsx.spl.util.ImportOrDirectoryScan;
+
+public composite ImportOrDirectoryScan(output outTuple)
+{
+	param
+		type $TupleType ;
+		expression<rstring> $ImportKind ;
+		expression<boolean> $fileFeedCompressed : false ;
+		expression<rstring> $InputDataDirectory ;
+		expression<enum{csv,txt,bin,block,line}> $fileFormat : csv;
+		expression<rstring> $InputDataFilePattern : ".*.csv" ;
+		expression<boolean> $FeedFromLog : false ;
+		expression<boolean> $FeedFromImport : true ;
+		expression<boolean> $UseThrottle : false;
+		expression<float64> $ThrottleRate : 100000.0;
+		expression<float64> $initDirScanDelay : 0.0;
+		expression<int32> $ImportQueueSize :(int32) 100000 ;
+		expression<enum{Wait,DropFirst,DropLast}> $throttle_type : Sys.DropFirst;
+
+	graph
+
+		// ###
+		// DirectoryScan - this is used to Scan the TP Log directory for testing purpose
+		// ###
+		stream<rstring FileName> DirScan = DirectoryScan()
+		{
+			param
+				directory : $InputDataDirectory ;
+				pattern : $InputDataFilePattern ;
+				sortBy : date ;
+				order : ascending ;
+				sleepTime : 0.5;
+				initDelay: $initDirScanDelay;
+		}
+
+		// ###
+		// Filter - this is used to stop the flow of data from Log files
+		// ###
+		stream<rstring FileName> FilterDirectoryScan = Filter(DirScan)
+		{
+			param
+				filter :(boolean) $FeedFromLog ;
+		}
+
+
+                // ###
+                // Custom - Join the two incoming feeds
+                // ###
+                ( stream<rstring FileName> FilterDirectoryScanNotCompressed;
+                  stream<rstring FileName> FilterDirectoryScanCompressed )  = Custom(FilterDirectoryScan)
+                {
+                        logic
+                                onTuple FilterDirectoryScan :
+                                { 
+                                  if ( $fileFeedCompressed ) 
+                                  {
+                                    submit({ FileName = FileName } , FilterDirectoryScanCompressed ) ;
+                                  }
+                                  else 
+                                  { 
+                                    submit({ FileName = FileName } , FilterDirectoryScanNotCompressed ) ;
+                                  }
+                                }
+                }
+
+		// ###
+		// FileSource - Feed the  Log Files Data for testing
+		// ###
+		stream<$TupleType> FileSourceFeed = FileSource(FilterDirectoryScanNotCompressed)
+		{
+			param
+				format : $fileFormat ;
+				ignoreExtraCSVValues : true;
+		} 
+
+		// ###
+		// FileSource - Feed the  Log Files Data for testing
+		// ###
+		stream<$TupleType> FileSourceFeed2 = FileSource(FilterDirectoryScanCompressed)
+		{
+			param
+				format : $fileFormat ;
+                                compression : gzip;
+				ignoreExtraCSVValues : true;
+		}
+
+
+
+		// () as fileNameFileSourceFeed  = printTuple(FileSourceFeed) { param PREFIX : "File Source = >"; }
+		// ###
+		// Import - Receive the Streams exported by com.verizon.sources  $ImportKind
+		// ###
+		stream<$TupleType> ImportFeed = Import()
+		{
+			param
+				subscription : kind == $ImportKind ;
+		}
+
+		// ###
+		// Custom - Join the two incoming feeds
+		// ###
+		stream<$TupleType> JoinedFeed = Custom(ImportFeed ; FileSourceFeed,FileSourceFeed2)
+		{
+			logic
+				onTuple ImportFeed :
+				{
+					if($FeedFromImport) submit(ImportFeed, JoinedFeed) ;
+				}
+
+				onPunct ImportFeed :
+				{
+					submit(currentPunct(), JoinedFeed);
+				}
+
+				onTuple FileSourceFeed :
+				{
+					submit(FileSourceFeed, JoinedFeed) ;
+				}
+
+                               onPunct FileSourceFeed :
+                               {
+                                  submit(currentPunct(), JoinedFeed);
+                               }
+
+
+		}
+
+		// ###
+		// Custom - Pass the stream through the Throttle operator or not depending on parameter value
+		// ###
+		(stream<$TupleType> ThrottleFeed; stream<$TupleType> NoThrottleFeed) as ThrottleOrNot = Custom(JoinedFeed)
+		{
+			logic
+
+			onTuple JoinedFeed:
+			{
+				if ($UseThrottle)
+				{
+					submit(JoinedFeed, ThrottleFeed);
+				}
+				else
+				{
+					submit(JoinedFeed, NoThrottleFeed);
+				}
+			}
+
+			onPunct JoinedFeed:
+			{
+				submit(currentPunct(), NoThrottleFeed);
+			}
+
+			config
+				threadedPort : queue(JoinedFeed, $throttle_type, $ImportQueueSize);
+		}
+
+		// ###
+		// Throttle - Pass the feed through the Throttle operator to limit tuples/sec
+		// ###
+		stream<$TupleType> ThrottleOutTuple = Throttle(ThrottleFeed as I)
+		{
+			param
+				rate : $ThrottleRate;
+		}
+
+		// ###
+		// Functor - join the ThrottleFeed and NoThrottleFeed and pass tothe outTuple
+		// ###
+		stream<$TupleType> outTuple = Functor(ThrottleOutTuple, NoThrottleFeed) {}
+	}
