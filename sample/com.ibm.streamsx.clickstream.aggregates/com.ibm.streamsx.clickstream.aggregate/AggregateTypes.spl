@@ -1,0 +1,29 @@
+namespace com.ibm.streamsx.clickstream.aggregate;
+
+
+type CountByDistinctAggregate_T = 
+                                rstring groupName,
+                                int64 firstTimestampInSec, 
+                                int64 timestampInSec, // lastTimeStamp
+                                int64 wcTimestampFirst, 
+                                int64 wcTimestampLast,
+                                list<rstring> itemList,
+                                list<int32> itemCountList,
+                                rstring label;
+                                
+                                
+type CountByDistinctAggRedis_T = 
+                                rstring groupName,
+                                int64 firstTimestampInSec, 
+                                int64 timestampInSec, // lastTimeStamp
+                                list<rstring> itemList,
+                                list<int32> itemCountList,
+                                int32 rollingIndex;
+    
+type ToBeCountedByDistinct_T = 
+                                int64 timestampInSec,
+                                int64 wcTimestamp, 
+                                rstring groupByField,
+                                rstring item;
+                                
+
