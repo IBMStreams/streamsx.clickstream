@@ -1,0 +1,39 @@
+namespace com.ibm.streamsx.clickstream.aggregate ;
+
+use com.ibm.streamsx.clickstream.util::* ;
+
+public composite CountByDistinctAggregate(output stream<CountByDistinctAggregate_T> CountByDistinctAggregate ; input InputStream)
+{
+	param
+		expression<int64> $WindowInSec ; // Tumbling window in sec
+		expression $timestampField ; // Timestamp field - e.g. epoch time in sec 
+		expression $wcTimestampField ; // Wall clock timestamp field - e.g. epoch time in sec 
+		expression $groupByField ; // Field name to be used for groupBy
+		expression $itemField ; // Filed name of items to be counted by distinct
+		expression<rstring> $label; // name of the aggregate 
+		
+	graph
+		stream<InputStream> ClkStrmPunctuated = ClickstreamsTimestampPunctor(InputStream)
+		{
+			param
+				WindowInSec :  $WindowInSec ;
+				timestampField : $timestampField  ;
+		}
+		
+		stream<CountByDistinctAggregate_T> CountByDistinctAggregate = Aggregate(ClkStrmPunctuated as T)
+        {
+            window
+                T : tumbling, punct();
+            param
+                groupBy : $groupByField ;
+            output
+                CountByDistinctAggregate : groupName = Any($groupByField),
+                    firstTimestampInSec = First($timestampField), 
+                    timestampInSec = Last($timestampField), 
+                    wcTimestampFirst = First($wcTimestampField), 
+                    wcTimestampLast  = Last($wcTimestampField),
+                    itemCollectDistinct = CollectDistinct($itemField),
+                    itemCountByDistinct = CountByDistinct($itemField),
+                    label = $label;
+        } 
+}
