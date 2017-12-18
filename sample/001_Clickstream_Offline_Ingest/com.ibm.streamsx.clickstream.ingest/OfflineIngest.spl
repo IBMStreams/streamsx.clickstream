@@ -12,8 +12,9 @@ composite OfflineIngest
 		stream<rstring name> DirScanData = DirectoryScan()
 		{
 			param
-				directory : spl.utility::dataDirectory() ;
-				initDelay : 5.0;
+				// directory : spl.utility::dataDirectory() ;
+				directory : getThisToolkitDir() + "/etc/offlineData";
+				initDelay : 2.0;
 		}
 
 		stream<DSXClkStrm_T> TupleClkStrm  = FileSource(DirScanData)

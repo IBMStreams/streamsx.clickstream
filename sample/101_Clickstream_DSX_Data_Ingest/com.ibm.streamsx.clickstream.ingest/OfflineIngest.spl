@@ -49,7 +49,7 @@ composite DSXOfflineIngest
 		onTuple TupleClkStrm : {
 			mutable DSXClkStrm_T outT = {};
 			mutable tuple<int32 sec, int32 min, int32 hour, int32 mday, int32 mon, int32 year, int32 wday, int32 yday, int32 isdst, int32 gmtoff, rstring zone> result = {};
-			gmtime (inT.time_stamp, result);
+			time (inT.time_stamp, result);
 			assignFrom(outT,inT);
 			outT.time_stamp = strftime (result, "%FT%T");
 			submit(outT,TupleDSXClkStrm);

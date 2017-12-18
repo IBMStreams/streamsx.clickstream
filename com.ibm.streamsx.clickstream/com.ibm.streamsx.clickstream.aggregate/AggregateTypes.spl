@@ -11,6 +11,7 @@ type CountByDistinctAggregate_T =
                                 int64 wcTimestampFirst, 
                                 int64 wcTimestampLast;
 
+
 type CountDistinctWithListAggregate_T = 
                                 rstring label,
                                 rstring groupName,

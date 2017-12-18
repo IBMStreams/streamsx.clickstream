@@ -1,9 +1,15 @@
 .PHONY: all distributed clean 
 
-SPLC_FLAGS ?= -a
+NS=com.ibm.streamsx.clickstream.ingest
+APP=MessageHubIngest
+
+SPL_MAIN_COMPOSITE = $(NS)::$(APP)
+STREAMS_DEFAULT_OUTPUT_DIR=../../output/$(APP)
+
+SPLC_FLAGS ?= -a --output-directory=$(STREAMS_DEFAULT_OUTPUT_DIR)
+
 SPLC = $(STREAMS_INSTALL)/bin/sc
 SPL_CMD_ARGS ?= 
-SPL_MAIN_COMPOSITE = com.ibm.streamsx.clickstream.ingest::MessageHubIngest
 
 # Toolkit dependencies 
 SPLC_TOOLKIT_CLICKSTREAM_DSX_TYPES=../000_Clickstream_DSX_Types
@@ -20,7 +26,7 @@ SPLC_FLAGS+= -t $(SPLC_TOOLKITS)
 all: distributed
 
 distributed:
-	echo $(SPLC_TOOLKITS)
+	@mkdir -p $(STREAMS_DEFAULT_OUTPUT_DIR)
 	$(SPLC) $(SPLC_FLAGS) -M $(SPL_MAIN_COMPOSITE) $(SPL_CMD_ARGS)
 
 clean: 

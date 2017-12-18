@@ -83,8 +83,8 @@ composite ClickstreamAggregates
 		{
 			param
 				hasDelayField : true ; // Add the time delay field for timed offline replay
-				file : dataDirectory() +
-					"/ClkStrmCountByDistinctAggregate_{localtime:%Y.%m.%d_%H.%M.%S}.csv.gz" ;
+				file : $dataOutDir +
+					"ClkStrmCountByDistinctAggregate_{localtime:%Y.%m.%d_%H.%M.%S}.csv.gz" ;
 				format : csv ;
 				flush : 100u ;
 				tuplesPerFile : 10000u ;
@@ -146,8 +146,8 @@ composite ClickstreamAggregates
 		{
 			param
 				hasDelayField : true ; // Add the time delay field for timed offline replay
-				file : dataDirectory() +
-					"/ClkStrmCountDistinctAggregate_{localtime:%Y.%m.%d_%H.%M.%S}.csv.gz" ;
+				file : $dataOutDir +
+					"ClkStrmCountDistinctAggregate_{localtime:%Y.%m.%d_%H.%M.%S}.csv.gz" ;
 				format : csv ;
 				flush : 100u ;
 				tuplesPerFile : 10000u ;
