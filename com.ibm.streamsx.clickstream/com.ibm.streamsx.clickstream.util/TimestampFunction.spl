@@ -1,0 +1,7 @@
+namespace com.ibm.streamsx.clickstream.util;
+
+public rstring timestampInSecToElasticsearchDataTime(int64 timestampInSec) {
+	mutable tuple<int32 sec, int32 min, int32 hour, int32 mday, int32 mon, int32 year, int32 wday, int32 yday, int32 isdst, int32 gmtoff, rstring zone> result = {};
+	time (createTimestamp(timestampInSec, (uint32) 0) , result);
+	return strftime (result, "%FT%T%z");
+}

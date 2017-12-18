@@ -1,0 +1,134 @@
+namespace com.ibm.streamsx.clickstream.sink.elasticsearch ;
+
+use com.ibm.streamsx.elasticsearch::ElasticsearchRestIndex ;
+use com.ibm.streamsx.clickstream.aggregate::* ;
+use com.ibm.streamsx.clickstream.util::*;
+
+type CountCustomersByEvent_T = 
+    							rstring label,                   // rstring label,                               
+                                rstring click_event,             // rstring groupName,                           
+                                int32 distinct_customer_count,   // int32 itemCountDistinct,                     
+                                int32 event_count,               // int32 itemCount,                             
+                                rstring csFirstTimestamp,          // int64 firstTimestampInSec,                   
+                                rstring csLastTimestamp,           // int64 timestampInSec, // lastTimeStamp       
+                                rstring wcFirstTimestamp,        // int64 wcTimestampFirst,                      
+                                rstring wcLastTimestamp;         // int64 wcTimestampLast;       
+                                
+                                
+ type CountProductNameByCategory_T = 
+                                rstring label,                    //  rstring label,                            
+                                rstring Category,                 //  rstring groupName,                        
+                                rstring Product,                  //  list<rstring> itemCollectDistinct,        
+                                int32   Count,                    //  list<int32> itemCountByDistinct,          
+                                rstring csFirstTimestamp,         //  int64 firstTimestampInSec,                
+                                rstring csLastTimestamp,          //  int64 timestampInSec, // lastTimeStamp    
+                                rstring wcFirstTimestamp,         //  int64 wcTimestampFirst,                   
+                                rstring wcLastTimestamp;          //  int64 wcTimestampLast;                    
+                                
+                            
+composite ClkStrmElasticSink
+{
+	param
+
+		expression<rstring> $importCountByDistinctKind : getCompileTimeValue("exportCountByDistinctKind", "ClkStrmCountByDistinctAggregateStream") ;
+		expression<rstring> $importCountDistinctKind   : getCompileTimeValue("exportCountDistinctKind"  , "ClkStrmCountByDistinctAggregateStream") ;
+		expression<rstring> $ElasticsearchHost : getSubmissionTimeValue("ElasticsearchHost", "localhost") ;
+		expression<int32> $ElasticsearchPort : (int32) getSubmissionTimeValue("ElasticsearchPort", "9200") ;
+		expression<float64> $throttleRate : (float64) getSubmissionTimeValue("throttleRate" , "100000.0") ;
+		type $CountByDistinctAggregateType : CountByDistinctAggregate_T ;
+		type $CountDistinctAggregateType   : CountDistinctAggregate_T ;
+	graph
+	
+	
+		/* ==========================
+		 * CountDistinct -- Pipeline
+		 * ==========================
+		 */
+		stream<$CountDistinctAggregateType> CountDistinctAggregate = Import()
+		{
+			param
+				subscription : kind == $importCountDistinctKind ;
+		}
+		
+		
+		stream<$CountDistinctAggregateType> ThrCountDistinctAggregate = Throttle(CountDistinctAggregate as t)
+		{
+			param
+				rate : $throttleRate ;
+			config
+				threadedPort : queue(t, Sys.DropFirst, 100000 );
+		}
+		
+		stream<CountCustomersByEvent_T> CountDistinctAggregateEs as oT = Functor(ThrCountDistinctAggregate as t)
+		{                                                                                  
+			output oT :  label                    =    label,                                      
+			             click_event              =    groupName,                            
+			             distinct_customer_count  =    itemCountDistinct,                
+			             event_count              =    itemCount,                                
+			             csFirstTimestamp         =    timestampInSecToElasticsearchDataTime(firstTimestampInSec),              
+			             csLastTimestamp          =    timestampInSecToElasticsearchDataTime(timestampInSec),    
+			             wcFirstTimestamp         =    timestampInSecToElasticsearchDataTime(wcTimestampFirst),                  
+			             wcLastTimestamp          =    timestampInSecToElasticsearchDataTime(wcTimestampLast);                    
+		}
+
+		() as ElasticSinkCountDistinctAggregate = ElasticsearchRestIndex(CountDistinctAggregateEs)
+		{
+			param
+				indexName : "dsx_clickstreams" ;
+				typeName : "label" ;
+				bulkSize : (int32) "5" ;   
+				hostName : $ElasticsearchHost;
+				hostPort : $ElasticsearchPort;
+				reconnectionPolicyCount : 3;		
+		}
+		
+		/* ==========================
+		 * CountByDistinct -- Pipeline
+		 * ==========================
+		 */
+		stream<$CountByDistinctAggregateType> CountByDistinctAggregate = Import()
+		{
+			param
+				subscription : kind == $importCountByDistinctKind ;
+		}
+		
+		
+		stream<$CountByDistinctAggregateType> ThrCountByDistinctAggregate = Throttle(CountByDistinctAggregate as t)
+		{
+			param
+				rate : $throttleRate ;
+			config
+				threadedPort : queue(t, Sys.DropFirst, 100000 );
+		}
+		
+		stream<CountProductNameByCategory_T> CountByDistinctAggregateEs = Custom(ThrCountByDistinctAggregate as t) {
+			logic
+			onTuple t : {
+				mutable CountProductNameByCategory_T o = {};
+				o.label             = t.label;
+				o.Category          = t.groupName;
+				o.csFirstTimestamp  = timestampInSecToElasticsearchDataTime(t.firstTimestampInSec);     
+				o.csLastTimestamp   = timestampInSecToElasticsearchDataTime(t.timestampInSec);         
+				o.wcFirstTimestamp  = timestampInSecToElasticsearchDataTime(t.wcTimestampFirst);       
+				o.wcLastTimestamp   = timestampInSecToElasticsearchDataTime(t.wcTimestampLast);        
+				for (int32 i in range(t.itemCollectDistinct)) {
+					o.Product = t.itemCollectDistinct[i];          
+					o.Count   = t.itemCountByDistinct[i];     
+					submit(o,CountByDistinctAggregateEs);
+				}
+			}
+		}
+		
+
+		() as ElasticSinkCountByDistinctAggregate = ElasticsearchRestIndex(CountByDistinctAggregateEs)
+		{
+			param
+				indexName : "dsx_clickstreams" ;
+				typeName : "label" ;
+				bulkSize : (int32) "5" ;   
+				hostName : $ElasticsearchHost;
+				hostPort : $ElasticsearchPort;
+				reconnectionPolicyCount : 3;		
+		}
+}
+

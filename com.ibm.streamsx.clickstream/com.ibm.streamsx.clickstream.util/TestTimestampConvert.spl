@@ -1,0 +1,28 @@
+namespace com.ibm.streamsx.clickstream.util ;
+
+composite TestTimestampConvert
+{
+	graph
+		stream<int32 x> beat = Beacon()
+		{
+
+			param
+				iterations : 1;
+			output
+				beat : x = 1;
+		}
+
+		() as Custom_2 = Custom(beat)
+		{
+			logic
+				onTuple beat :
+				{
+				// Add code here
+				// int64 TimestampInSec = 1510888195;
+				int64 TimestampInSec = getTimestampInSecs() ;
+				printStringLn( timestampInSecToElasticsearchDataTime(TimestampInSec) ) ;
+		}
+	}
+
+}
+
