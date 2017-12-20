@@ -1,0 +1,22 @@
+[
+  {
+    "name": "messageHubTopic",
+    "type": "rstring",
+    "value": "dsxClkStrm"
+  },
+  {
+    "name": "exportKind",
+    "type": "rstring",
+    "value": "dsxClkStrmTupleStream"
+  },
+  {
+    "name": "throttleRate",
+    "type": "float64",
+    "value": "100000000.0"
+  },
+  {
+    "name": "outputDir",
+    "type": "rstring",
+    "value": "/tmp/"
+  }
+]

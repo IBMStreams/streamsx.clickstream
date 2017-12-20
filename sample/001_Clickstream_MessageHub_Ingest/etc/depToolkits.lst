@@ -1,0 +1,5 @@
+# These are the dependency toolkits - Comments with # is allowed
+# The following paths are relative to the scripts directory 
+../sample/000_Clickstream_DSX_Types # Types
+../com.ibm.streamsx.spl.util
+../com.ibm.streamsx.messagehub
